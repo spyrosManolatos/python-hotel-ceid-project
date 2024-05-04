@@ -1,46 +1,97 @@
 import csv
 import math
+from functools import *
 
-def cityOrResortHotelPercentage():
-    totalRecordsCounter = 0
-    cityHotelCounter = 0
-    resortHotelCounter = 0
+
+def findResortHotels():
     with open('hotel_booking.csv', mode='r') as csvfile:
-        csvreader = csv.DictReader(csvfile)
-        for row in csvreader:
-            for key, value in row.items():
-                if key == 'hotel':
-                    totalRecordsCounter = totalRecordsCounter + 1
-                    if value == 'Resort Hotel':
-                        resortHotelCounter = resortHotelCounter + 1
-                    else:
-                        cityHotelCounter = cityHotelCounter + 1
-    print("Total Record Counter: " + str(totalRecordsCounter))
-    print("Percentage of city hotels: " + str(math.floor((cityHotelCounter/totalRecordsCounter) * 100)))
-    print("Percentage of resort hotels: " + str(math.floor((resortHotelCounter/totalRecordsCounter) * 100)))
+        csvReader = csv.DictReader(csvfile)
+        resortHotels = list(filter(lambda row: row['hotel'] == 'Resort Hotel', csvReader))
+    return len(resortHotels)
 
+
+def findCityHotels():
+    with open('hotel_booking.csv', mode='r') as csvfile:
+        csvReader = csv.DictReader(csvfile)
+        cityHotels = list(filter(lambda row: row['hotel'] == 'City Hotel', csvReader))
+    return len(cityHotels)
+
+
+def findResortHotelsWithNoCancels():
+    with open('hotel_booking.csv', mode='r') as csvfile:
+        csvReader = csv.DictReader(csvfile)
+        resortHotels = list(filter(lambda row: row['hotel'] == 'Resort Hotel' and row['is_canceled'] == '0', csvReader))
+    return resortHotels
+
+
+def findCityHotelsWithNoCancels():
+    with open('hotel_booking.csv', mode='r') as csvfile:
+        csvReader = csv.DictReader(csvfile)
+        cityHotels = list(filter(lambda row: row['hotel'] == 'City Hotel' and row['is_canceled'] == '0', csvReader))
+    return cityHotels
 
 
 def findCancellations():
-    cancelResort = 0
-    cancelCity = 0
-    cancelArray = []
-    cancelArray.append(cancelResort)  ##counter for cancelResort
-    cancelArray.append(cancelCity)   ##counter for cancelCity
     with open('hotel_booking.csv', mode='r') as csvfile:
-        csvreader = csv.DictReader(csvfile)
-        for row in csvreader:
-            for key, value in row.items():
-                for key2, value2 in row.items():
-                    if key == 'is_canceled' and key2 == 'hotel':
-                        if value == '1' and value2 == 'Resort Hotel':
-                            cancelArray[0] = cancelArray[0] + 1
-                        elif value == '1' and value2 == 'City Hotel':
-                            cancelArray[1] = cancelArray[1] + 1
-    # print("Total cancellations: " + str(cancelArray.reduce(lambda x,y: x+y)))
-    print("Total City Hotel cancellations: " + str(cancelArray[0]))
-    print("Total Resort Hotel cancellations: " + str(cancelArray[1]))
+        csvReader = csv.DictReader(csvfile)
+        cityHotels = list(filter(lambda row: row['hotel'] == 'City Hotel' and row['is_canceled'] == '1', csvReader))
+    with open('hotel_booking.csv', mode='r') as csvfile:
+        csvReader = csv.DictReader(csvfile)
+        resortHotels = list(filter(lambda row: row['hotel'] == 'Resort Hotel' and row['is_canceled'] == '1', csvReader))
+    print("The percentage of the total cancellations of the resort Hotels:" + str(
+        math.floor(len(resortHotels) / findResortHotels() * 100)))
+
+    print("The percentage of the total cancellations of the city Hotels:" + str(
+        math.floor(len(cityHotels) / findCityHotels() * 100)))
+
+
+def findStayByNight():
+    resortHotels = findCityHotelsWithNoCancels()
+    cityHotels = findResortHotelsWithNoCancels()
+    accumulate_stays = lambda acc, row: acc + int(row['stays_in_week_nights']) + int(row['stays_in_weekend_nights'])
+
+    # Calculate total stays by night for resort hotels
+    staysByNightInResortHotel = reduce(accumulate_stays, resortHotels, 0)
+
+    # Calculate total stays by night for city hotels
+    staysByNightInCityHotel = reduce(accumulate_stays, cityHotels, 0)
+
+    print('stays by night in resort hotel:', staysByNightInResortHotel / (findResortHotels() + findCityHotels()))
+    print('stays by night in city hotels:', staysByNightInCityHotel / (findCityHotels() + findResortHotels()))
+
+
+def bookingsPerSeasonAndMonth():
+    monthsMappedToSeasons = {'January': 'Winter', 'February': 'Winter', 'March': 'Spring', 'April': 'Spring',
+                             'May': 'Spring',
+                             'June': 'Summer', 'July': 'Summer', 'August': 'Summer', 'September': 'Fall',
+                             'October': 'Fall',
+                             'November': 'Fall', 'December': 'Winter'}
+    bookingsPerSeasonResortHotel = {season: 0 for season in monthsMappedToSeasons.values()}
+    bookingsPerMonthResortHotel = {month: 0 for month in monthsMappedToSeasons.keys()}
+    bookingsPerSeasonCityHotel = bookingsPerSeasonResortHotel.copy()
+    bookingsPerMonthCityHotel = bookingsPerMonthResortHotel.copy()
+    resortHotels = findResortHotelsWithNoCancels()
+    cityHotels = findCityHotelsWithNoCancels()
+    for key, value in monthsMappedToSeasons.items():
+        bookingsPerMonthResortHotel[key] = len(list(filter(lambda row: row['arrival_date_month'] == key, resortHotels)))
+        bookingsPerSeasonResortHotel[value] += bookingsPerMonthResortHotel[key]
+    for key, value in monthsMappedToSeasons.items():
+        bookingsPerMonthCityHotel[key] = len(list(filter(lambda row: row['arrival_date_month'] == key, cityHotels)))
+        bookingsPerSeasonCityHotel[value] += bookingsPerMonthCityHotel[key]
+    print("seasons booking city hotel: " + str(bookingsPerSeasonCityHotel))
+    print("seasons booking resort hotel: " + str(bookingsPerSeasonResortHotel))
+    print("month booking city hotel: " + str(bookingsPerMonthCityHotel))
+    print("month booking resort hotel: " + str(bookingsPerMonthResortHotel))
+
+
+def bookingsPerRoomType():
+    pass
+
+
+def travellerKinds():
+    pass
 
 
 findCancellations()
-cityOrResortHotelPercentage()
+findStayByNight()
+bookingsPerSeasonAndMonth()
